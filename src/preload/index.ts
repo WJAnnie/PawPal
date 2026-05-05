@@ -65,6 +65,7 @@ const api = {
   startFocus: (): void => ipcRenderer.send("focus:start"),
   stopFocus: (): void => ipcRenderer.send("focus:stop"),
   resetToday: (): void => ipcRenderer.send("stats:reset-today"),
+  openChatWindow: (): void => ipcRenderer.send("chat:open-window"),
   onPetState: (callback: (state: PetState) => void): Unsubscribe =>
     onChannel("pet:set-state", callback),
   onShowBubble: (callback: (bubble: SpeechBubble) => void): Unsubscribe =>

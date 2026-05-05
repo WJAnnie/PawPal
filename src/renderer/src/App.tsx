@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { i18n } from "../../shared/i18n";
+import { ChatWindow } from "./components/ChatWindow";
 import { PetView } from "./components/PetView";
 import { SettingsView } from "./components/SettingsView";
 import { pawpalApi } from "./pawpalApi";
@@ -24,5 +25,6 @@ export default function App(): JSX.Element {
 
   const route = window.location.hash.replace("#", "");
   if (route === "settings") return <SettingsView />;
+  if (route === "chat") return <ChatWindow />;
   return <PetView />;
 }

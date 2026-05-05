@@ -6,6 +6,7 @@ import type { DemoTrigger, PetAppearanceId, Settings } from "../../../shared/typ
 import { getPetAsset } from "../assets";
 import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
+import { AiSettingsSection } from "./AiSettingsSection";
 
 type SettingsCopy = ReturnType<typeof i18n>["settings"];
 
@@ -439,6 +440,8 @@ export function SettingsView(): JSX.Element {
           </div>
         </section>
       )}
+
+      <AiSettingsSection />
 
       <section className="prefs__group">
         <h2 className="prefs__group-title">{labels.about}</h2>

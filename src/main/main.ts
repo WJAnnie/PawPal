@@ -37,6 +37,7 @@ import {
   APP_NAME,
   BREAK_RUN_DURATION_MS,
   BREAK_RUN_TICK_MS,
+  CHAT_WINDOW,
   DISTRACTION_CHECK_INTERVAL_MS,
   DISTRACTION_WARNING_COOLDOWN_MS,
   IS_DEV,
@@ -79,6 +80,7 @@ const store = new Store<StoreSchema>({
 
 let petWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let chatWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let petState: PetState = "idle";
 let petFacing: PetFacing = "right";
@@ -229,6 +231,9 @@ function sendToAll<T>(channel: string, payload?: T): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.webContents.send(channel, payload);
   }
+  if (chatWindow && !chatWindow.isDestroyed()) {
+    chatWindow.webContents.send(channel, payload);
+  }
 }
 
 function publishSnapshot(): void {
@@ -262,13 +267,13 @@ function hideBubble(): void {
   sendToPet("pet:hide-bubble");
 }
 
-function rendererUrl(route: "pet" | "settings"): string {
+function rendererUrl(route: "pet" | "settings" | "chat"): string {
   const devServer = process.env.ELECTRON_RENDERER_URL;
   if (devServer) return `${devServer}#${route}`;
   return RENDERER_HTML_PATH;
 }
 
-function loadRenderer(win: BrowserWindow, route: "pet" | "settings"): void {
+function loadRenderer(win: BrowserWindow, route: "pet" | "settings" | "chat"): void {
   const devServer = process.env.ELECTRON_RENDERER_URL;
   if (devServer) {
     void win.loadURL(rendererUrl(route));
@@ -411,6 +416,44 @@ function createSettingsWindow(): void {
   });
 }
 
+function createChatWindow(): void {
+  if (chatWindow && !chatWindow.isDestroyed()) {
+    if (chatWindow.isMinimized()) chatWindow.restore();
+    chatWindow.focus();
+    return;
+  }
+
+  chatWindow = new BrowserWindow({
+    width: CHAT_WINDOW.width,
+    height: CHAT_WINDOW.height,
+    title: `${APP_NAME} · AI`,
+    resizable: true,
+    minWidth: 640,
+    minHeight: 480,
+    show: false,
+    backgroundColor: "#1f1b16",
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 14 } }
+      : {}),
+    webPreferences: {
+      preload: PRELOAD_PATH,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webSecurity: !IS_DEV
+    }
+  });
+
+  loadRenderer(chatWindow, "chat");
+  chatWindow.once("ready-to-show", () => {
+    chatWindow?.show();
+    publishSnapshot();
+  });
+  chatWindow.on("closed", () => {
+    chatWindow = null;
+  });
+}
+
 function createTray(): void {
   tray = new Tray(createTrayImage());
   tray.setToolTip(APP_NAME);
@@ -455,7 +498,8 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
           { label: labels.demoHappyReaction, click: () => triggerDemo("happy") }
         ]),
     { type: "separator" },
-    { label: labels.settings, click: createSettingsWindow }
+    { label: labels.settings, click: createSettingsWindow },
+    { label: "AI 对话", click: createChatWindow }
   ];
 }
 
@@ -500,6 +544,7 @@ function showPetContextMenu(): void {
   const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: labels.settings, click: createSettingsWindow },
+    { label: "AI 对话", click: createChatWindow },
     {
       label: focusActive ? labels.stopFocusMode : labels.startFocusMode,
       click: () => {
@@ -808,14 +853,31 @@ function happyFeedback(message: string | null = pick(text().bubble.woof), after?
   if (blockingMode) return;
   const returnState = focusActive ? "focusGuard" : "idle";
   setPetState("happy");
+  const aiReady = isAiReady();
   if (message) {
-    showBubble({ id: "happy", message, autoDismissMs: 1800 });
+    showBubble({
+      id: "happy",
+      message,
+      autoDismissMs: aiReady ? 4500 : 1800,
+      actions: aiReady
+        ? [{ id: "ai:open-chat", label: "聊一会儿", kind: "primary" }]
+        : undefined
+    });
   }
   setTimeout(() => {
-    hideBubble();
     setPetState(returnState);
+    if (!aiReady) hideBubble();
     after?.();
   }, 1900);
+}
+
+function isAiReady(): boolean {
+  try {
+    const settings = getAiService().loadSettings();
+    return settings.apiKey.trim().length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function triggerBreakReminder(fromDemo: boolean): void {
@@ -1012,6 +1074,11 @@ function handleBubbleAction(actionId: string): void {
   }
   if (actionId === "focus:end") {
     stopFocusMode(false);
+    return;
+  }
+  if (actionId === "ai:open-chat") {
+    hideBubble();
+    createChatWindow();
   }
 }
 
@@ -1103,6 +1170,10 @@ function registerAiIpc(): void {
 
   ipcMain.on("ai:stop", (_event, requestId: string) => {
     getAiService().stop(requestId);
+  });
+
+  ipcMain.on("chat:open-window", () => {
+    createChatWindow();
   });
 }
 
