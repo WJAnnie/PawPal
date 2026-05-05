@@ -1,5 +1,6 @@
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
 import {
   app,
   BrowserWindow,
@@ -48,6 +49,10 @@ import {
 } from "./config";
 import { classifyDistraction, isPermissionError, readActiveWindow } from "./distraction";
 import { createTrayImage } from "./trayIcon";
+import { AiSettingsStore } from "./ai/settingsStore";
+import { ChatHistoryStore } from "./ai/chatHistory";
+import { ChatService } from "./ai/chatService";
+import type { AiSettings } from "../shared/ai/types";
 
 type PetPosition = {
   x: number;
@@ -1014,7 +1019,7 @@ function registerIpc(): void {
   ipcMain.handle("app:get-snapshot", () => snapshot());
   ipcMain.on("app:open-release-notes", () => {
     void shell.openExternal(RELEASES_URL).catch((error) => {
-      console.error("Failed to open PawPal releases:", error);
+      console.error("Failed to open AI-WorkPet releases:", error);
     });
   });
   ipcMain.on("pet:clicked", () => {
@@ -1034,6 +1039,71 @@ function registerIpc(): void {
   ipcMain.on("focus:start", startFocusMode);
   ipcMain.on("focus:stop", () => stopFocusMode(false));
   ipcMain.on("stats:reset-today", resetTodayStats);
+
+  // AI subsystem (see docs/ai-design.md). Lazy-initialised so that any error
+  // here does not break PawPal's existing reminder / focus / animation core.
+  registerAiIpc();
+}
+
+let aiServiceSingleton: ChatService | null = null;
+function getAiService(): ChatService {
+  if (!aiServiceSingleton) {
+    const settingsStore = new AiSettingsStore();
+    const historyStore = new ChatHistoryStore();
+    aiServiceSingleton = new ChatService(settingsStore, historyStore);
+  }
+  return aiServiceSingleton;
+}
+
+function registerAiIpc(): void {
+  ipcMain.handle("ai:get-settings", (): AiSettings => getAiService().loadSettings());
+  ipcMain.handle("ai:save-settings", (_event, payload: AiSettings): AiSettings =>
+    getAiService().saveSettings(payload)
+  );
+
+  ipcMain.handle("ai:list-sessions", () => getAiService().listSessions());
+  ipcMain.handle("ai:get-session", (_event, id: string) => getAiService().getSession(id));
+  ipcMain.handle("ai:new-session", (_event, title?: string) =>
+    getAiService().newSession(title)
+  );
+  ipcMain.handle("ai:delete-session", (_event, id: string) =>
+    getAiService().deleteSession(id)
+  );
+
+  ipcMain.handle(
+    "ai:send",
+    async (event, payload: { sessionId: string; userText: string }) => {
+      const sender = event.sender;
+      const requestId = randomUUID();
+      await getAiService().send(
+        payload.sessionId,
+        payload.userText,
+        {
+          onDelta: (delta) => {
+            if (!sender.isDestroyed()) {
+              sender.send("ai:delta", { requestId, delta });
+            }
+          },
+          onDone: (finalMessage) => {
+            if (!sender.isDestroyed()) {
+              sender.send("ai:done", { requestId, finalMessage });
+            }
+          },
+          onError: (message) => {
+            if (!sender.isDestroyed()) {
+              sender.send("ai:error", { requestId, message });
+            }
+          },
+        },
+        requestId
+      );
+      return { requestId };
+    }
+  );
+
+  ipcMain.on("ai:stop", (_event, requestId: string) => {
+    getAiService().stop(requestId);
+  });
 }
 
 protocol.registerSchemesAsPrivileged([

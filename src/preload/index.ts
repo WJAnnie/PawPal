@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AiDeltaEvent,
+  AiDoneEvent,
+  AiErrorEvent,
+  AiSendResult,
+  AiSettings,
+  ChatSession,
+} from "../shared/ai/types";
+import type {
   AppSnapshot,
   DemoTrigger,
   PetState,
@@ -15,6 +23,28 @@ function onChannel<T>(channel: string, callback: (payload: T) => void): Unsubscr
   ipcRenderer.on(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
 }
+
+const ai = {
+  getSettings: (): Promise<AiSettings> => ipcRenderer.invoke("ai:get-settings"),
+  saveSettings: (settings: AiSettings): Promise<AiSettings> =>
+    ipcRenderer.invoke("ai:save-settings", settings),
+
+  send: (sessionId: string, userText: string): Promise<AiSendResult> =>
+    ipcRenderer.invoke("ai:send", { sessionId, userText }),
+  stop: (requestId: string): void => ipcRenderer.send("ai:stop", requestId),
+
+  listSessions: (): Promise<ChatSession[]> => ipcRenderer.invoke("ai:list-sessions"),
+  getSession: (id: string): Promise<ChatSession | null> => ipcRenderer.invoke("ai:get-session", id),
+  newSession: (title?: string): Promise<ChatSession> => ipcRenderer.invoke("ai:new-session", title),
+  deleteSession: (id: string): Promise<void> => ipcRenderer.invoke("ai:delete-session", id),
+
+  onDelta: (callback: (event: AiDeltaEvent) => void): Unsubscribe =>
+    onChannel("ai:delta", callback),
+  onDone: (callback: (event: AiDoneEvent) => void): Unsubscribe =>
+    onChannel("ai:done", callback),
+  onError: (callback: (event: AiErrorEvent) => void): Unsubscribe =>
+    onChannel("ai:error", callback),
+};
 
 const api = {
   getSnapshot: (): Promise<AppSnapshot> => ipcRenderer.invoke("app:get-snapshot"),
@@ -45,7 +75,10 @@ const api = {
   onStatsUpdated: (callback: (stats: TodayStats) => void): Unsubscribe =>
     onChannel("stats:updated", callback),
   onSnapshot: (callback: (snapshot: AppSnapshot) => void): Unsubscribe =>
-    onChannel("app:snapshot", callback)
+    onChannel("app:snapshot", callback),
+
+  // AI subsystem (FU#1: see docs/ai-design.md)
+  ai,
 };
 
 contextBridge.exposeInMainWorld("pawpal", api);
