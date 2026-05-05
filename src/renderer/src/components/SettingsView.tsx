@@ -242,7 +242,7 @@ export function SettingsView(): JSX.Element {
       <header className="prefs__head">
         <img className="prefs__avatar" src={petAvatar.src} alt="" />
         <div className="prefs__intro">
-          <p className="prefs__eyebrow">PawPal</p>
+          <p className="prefs__eyebrow">AI-WorkPet</p>
           <h1 className="prefs__title">{labels.today}</h1>
         </div>
       </header>

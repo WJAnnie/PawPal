@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export const APP_NAME = "PawPal";
+export const APP_NAME = "AI-WorkPet";
 export const STORE_NAME = "pawpal";
-export const RELEASES_URL = "https://github.com/zebangeth/PawPal/releases";
+export const RELEASES_URL = "https://github.com/WJAnnie/PawPal/releases";
 
 export const PET_WINDOW = {
   width: 220,

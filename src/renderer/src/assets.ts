@@ -36,7 +36,7 @@ export function getPetAsset(
 
   if (asset.isPlaceholder && !warnedPlaceholders.has(warningKey)) {
     warnedPlaceholders.add(warningKey);
-    console.warn(`PawPal is using a placeholder asset for ${warningKey}.`);
+    console.warn(`AI-WorkPet is using a placeholder asset for ${warningKey}.`);
   }
 
   const src = new URL(window.pawpal.assetUrl(selectedPath));

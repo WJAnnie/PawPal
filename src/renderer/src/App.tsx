@@ -9,7 +9,7 @@ function PreloadUnavailable(): JSX.Element {
   return (
     <main className="settings-shell">
       <header>
-        <p className="eyebrow">PawPal</p>
+        <p className="eyebrow">AI-WorkPet</p>
         <h1>{labels.preloadUnavailable}</h1>
       </header>
       <section className="settings-section">

@@ -2,29 +2,39 @@
   <img src="docs/social-preview.png" alt="PawPal" width="800" />
 </p>
 
-<h1 align="center">PawPal</h1>
+<h1 align="center">AI-WorkPet</h1>
 
 <p align="center">
-  一只住在你桌面上的小狗，提醒你休息、喝水、保持专注。
+  一只能聊天、能陪你番茄钟、还能随便换形象的桌面宠物。
 </p>
 
 <p align="center">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/zebangeth/PawPal/total?style=flat-square&label=downloads" />
   <img alt="Electron" src="https://img.shields.io/badge/Electron-vite-47848f?style=flat-square&logo=electron&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=111111" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
 </p>
 
-PawPal 是一个桌面宠物应用，支持 macOS 和 Windows。一只透明、始终置顶的小狗会陪在你的屏幕上，在你久坐、忘记喝水或者分心刷社交媒体时，温柔地把你带回节奏里。
+> **致谢**：基于 [zebangeth/PawPal](https://github.com/zebangeth/PawPal) fork 而来。原项目是个轻量休息提醒小狗，本项目在它基础上加了 AI 对话、番茄钟、完全自定义形象、SQLite 聊天历史等功能。原始 PawPal 功能（休息/喝水提醒、专注模式、跨屏跑动画）全部保留。
+
+AI-WorkPet 是一个桌面宠物应用，支持 macOS 和 Windows。一只透明、始终置顶的小宠物会陪在你的屏幕上，跟你聊天、提醒你休息、和你一起跑番茄钟，并且可以让你用自己的图片完全自定义它的外观。
 
 ## 功能
 
+### AI-WorkPet 新增（v0.2+）
+
+- 🤖 **AI 对话** — 流式输出 + 多轮上下文 + OpenAI 兼容（DeepSeek / OpenAI / 通义 / Moonshot 等任意供应商，多 Profile 同时配置运行时切换）
+- ⏱ **番茄钟** — 25/5 + 4 番茄长休息 15min；完成自动加宠物好感度/精力
+- 🎭 **自定义形象** — 用 PNG / GIF / 序列帧替换默认宠物外观；触发器联动番茄钟与 AI 状态
+- 💾 **数据持久化** — JSON 配置 + SQLite 聊天历史，跨会话保留
+
+### 继承自 PawPal
+
 - **休息提醒** — 定时提醒你站起来活动一下，小狗会跑过整个屏幕引起你的注意
 - **喝水提醒** — 别忘了喝水
-- **专注模式** — 检测你当前在用的 app，如果你在刷社交媒体，小狗会来提醒你回去工作
-- **多种宠物外观** — 目前有线条小狗和金毛 puppy 两种风格
+- **专注模式** — 检测你当前在用的 app，如果你在刷社交媒体，小狗会来提醒你回去工作（macOS 已支持，Windows 实现中）
+- **多种内置外观** — 线条小狗 + 金毛 puppy
 - **中文 / English** — 支持中英文切换
-- **本地数据** — 所有设置和统计数据保存在本地，不联网
+- **本地数据** — 所有设置和统计数据保存在本地，不联网（除 AI 对话本身需访问你配置的 API 端点外）
 
 ## 安装
 

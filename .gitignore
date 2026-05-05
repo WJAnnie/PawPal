@@ -6,3 +6,4 @@ dist/
 *.log
 _raw_assets/
 CLAUDE.md
+.omc/
