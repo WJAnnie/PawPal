@@ -1,4 +1,4 @@
-import type { Language, PetAppearanceId, PetState } from "./types";
+import type { BuiltinAppearanceId, Language, PetAppearanceId, PetState } from "./types";
 import type { PetSpecies } from "./petSpecies";
 
 export type PetAssetDefinition = {
@@ -8,7 +8,7 @@ export type PetAssetDefinition = {
 };
 
 export type PetAppearanceManifest = {
-  id: PetAppearanceId;
+  id: BuiltinAppearanceId;
   species: PetSpecies;
   label: Record<Language, string>;
   fallback: PetAssetDefinition;
@@ -19,13 +19,13 @@ const goldenPuppy = (state: PetState, name: string): string =>
   `pet_assets/金毛 puppy/${state}/${name}`;
 const lineDog = (state: PetState, name: string): string => `pet_assets/线条小狗/${state}/${name}`;
 
-const STATE_FALLBACKS: Partial<Record<PetState, PetState>> = {
+export const STATE_FALLBACKS: Partial<Record<PetState, PetState>> = {
   breakDone: "happy",
   hydrationDone: "happy",
   focusDone: "happy"
 };
 
-export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
+export const BUILTIN_APPEARANCES: Record<BuiltinAppearanceId, PetAppearanceManifest> = {
   lovartPuppy: {
     id: "lovartPuppy",
     species: "dog",
@@ -163,22 +163,22 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
   }
 };
 
-export function resolvePetAppearanceId(value: unknown): PetAppearanceId {
+export function resolvePetAppearanceId(value: unknown): BuiltinAppearanceId {
   return value === "lineDog" ? "lineDog" : "lovartPuppy";
 }
 
-export function petAppearanceOptions(language: Language): Array<{ value: PetAppearanceId; label: string }> {
-  return Object.values(PET_APPEARANCES).map((appearance) => ({
+export function petAppearanceOptions(language: Language): Array<{ value: BuiltinAppearanceId; label: string }> {
+  return Object.values(BUILTIN_APPEARANCES).map((appearance) => ({
     value: appearance.id,
     label: appearance.label[language]
   }));
 }
 
-export function getPetAssetDefinition(
-  appearanceId: PetAppearanceId,
+export function getBuiltinAsset(
+  appearanceId: BuiltinAppearanceId,
   state: PetState
 ): PetAssetDefinition {
-  const appearance = PET_APPEARANCES[appearanceId];
+  const appearance = BUILTIN_APPEARANCES[appearanceId];
   const fallbackState = STATE_FALLBACKS[state];
   return (
     appearance.states[state] ??
@@ -187,6 +187,9 @@ export function getPetAssetDefinition(
   );
 }
 
-export function getPetSpecies(appearanceId: PetAppearanceId): PetSpecies {
-  return PET_APPEARANCES[appearanceId].species;
+// Compat alias: kept while stage A migrates callsites. Removed in stage C.
+export const getPetAssetDefinition = getBuiltinAsset;
+
+export function getPetSpecies(appearanceId: BuiltinAppearanceId): PetSpecies {
+  return BUILTIN_APPEARANCES[appearanceId].species;
 }
