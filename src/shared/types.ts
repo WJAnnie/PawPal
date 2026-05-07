@@ -1,6 +1,8 @@
 export type Language = "zh-CN" | "en";
 
-export type PetAppearanceId = "lovartPuppy" | "lineDog";
+export type BuiltinAppearanceId = "lovartPuppy" | "lineDog";
+export type CustomAppearanceId = `custom:${string}`;
+export type PetAppearanceId = BuiltinAppearanceId | CustomAppearanceId;
 
 export type PetFacing = "left" | "right";
 
