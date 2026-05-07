@@ -31,7 +31,13 @@ export class ChatService {
 
   constructor(
     private readonly settingsStore: AiSettingsStore,
-    private readonly historyStore: ChatHistoryStore
+    private readonly historyStore: ChatHistoryStore,
+    /**
+     * Optional provider that returns extra system-prompt context (e.g. live
+     * pet vitals) prepended to the user-configured systemPrompt at send time.
+     * Returning empty string disables the injection for that call.
+     */
+    private readonly getRuntimeContext: (() => string) | null = null
   ) {}
 
   /**
@@ -67,7 +73,22 @@ export class ChatService {
     // Build the message list to send to the API.
     const updated = await this.historyStore.get(sessionId);
     const cacheInput = updated ? updated.messages : [userMessage];
-    const composed = applySettingsToCache(cacheInput, settings);
+
+    // Augment systemPrompt with live runtime context (vitals) if a provider is
+    // wired. The original user-configured prompt remains the source of voice;
+    // we just prepend an "你现在的状态" line.
+    const runtimeCtx = this.getRuntimeContext?.()?.trim() ?? "";
+    const settingsForRequest =
+      runtimeCtx.length > 0
+        ? {
+            ...settings,
+            systemPrompt: settings.systemPrompt.trim().length
+              ? `${runtimeCtx}\n\n${settings.systemPrompt}`
+              : runtimeCtx,
+          }
+        : settings;
+
+    const composed = applySettingsToCache(cacheInput, settingsForRequest);
 
     const controller = new AbortController();
     this.inflight.set(requestId, controller);

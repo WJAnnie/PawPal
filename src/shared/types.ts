@@ -31,6 +31,10 @@ export type SpeechBubble = {
   message: string;
   actions?: BubbleAction[];
   autoDismissMs?: number;
+  mode?: "text" | "chat";
+  chat?: {
+    sessionId: string;
+  };
 };
 
 export type BlockingMode = "break" | "breakRun" | "hydration" | "focusWarning" | null;
@@ -88,6 +92,7 @@ export type AppSnapshot = {
   blockingMode: BlockingMode;
   focusActive: boolean;
   dogVisible: boolean;
+  vitals: import("./vitals").PetVitals;
 };
 
 export type AppInfo = {

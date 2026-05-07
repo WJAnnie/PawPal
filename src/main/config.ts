@@ -13,6 +13,16 @@ export const PET_WINDOW = {
   height: 340
 } as const;
 
+export const PET_WINDOW_CHAT = {
+  width: 360,
+  height: 540
+} as const;
+
+export const PET_WINDOW_PANEL = {
+  width: 380,
+  height: 560
+} as const;
+
 export const SETTINGS_WINDOW = {
   width: 760,
   height: 680
@@ -21,6 +31,11 @@ export const SETTINGS_WINDOW = {
 export const CHAT_WINDOW = {
   width: 880,
   height: 640
+} as const;
+
+export const FRISBEE_WINDOW = {
+  width: 360,
+  height: 280
 } as const;
 
 export const PRELOAD_PATH = join(__dirname, "../preload/index.cjs");

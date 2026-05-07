@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_SETTINGS } from "../../shared/constants";
 import type { AppSnapshot, TodayStats } from "../../shared/types";
+import { createDefaultVitals } from "../../shared/vitals";
 
 const initialStats: TodayStats = {
   date: "",
@@ -37,7 +38,8 @@ export function useSnapshot(): AppSnapshot {
     petFacing: "right",
     blockingMode: null,
     focusActive: false,
-    dogVisible: true
+    dogVisible: true,
+    vitals: createDefaultVitals()
   });
 
   useEffect(() => {

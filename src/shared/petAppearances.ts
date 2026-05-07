@@ -1,4 +1,5 @@
 import type { Language, PetAppearanceId, PetState } from "./types";
+import type { PetSpecies } from "./petSpecies";
 
 export type PetAssetDefinition = {
   path: string | string[];
@@ -8,6 +9,7 @@ export type PetAssetDefinition = {
 
 export type PetAppearanceManifest = {
   id: PetAppearanceId;
+  species: PetSpecies;
   label: Record<Language, string>;
   fallback: PetAssetDefinition;
   states: Partial<Record<PetState, PetAssetDefinition>>;
@@ -26,6 +28,7 @@ const STATE_FALLBACKS: Partial<Record<PetState, PetState>> = {
 export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
   lovartPuppy: {
     id: "lovartPuppy",
+    species: "dog",
     label: {
       "zh-CN": "金毛 puppy (beta)",
       en: "Golden Puppy (beta)"
@@ -64,6 +67,7 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
   },
   lineDog: {
     id: "lineDog",
+    species: "dog",
     label: {
       "zh-CN": "线条小狗",
       en: "Line Dog"
@@ -181,4 +185,8 @@ export function getPetAssetDefinition(
     (fallbackState ? appearance.states[fallbackState] : undefined) ??
     appearance.fallback
   );
+}
+
+export function getPetSpecies(appearanceId: PetAppearanceId): PetSpecies {
+  return PET_APPEARANCES[appearanceId].species;
 }

@@ -4,6 +4,8 @@ import { i18n, resolveLanguage } from "../../../shared/i18n";
 import type { PetState, SpeechBubble } from "../../../shared/types";
 import { getPetAsset, getPetAssetVariantCount } from "../assets";
 import { useNow, useSnapshot } from "../hooks";
+import { BubbleChat } from "./BubbleChat";
+import { HoverPanel } from "./HoverPanel";
 
 type DragRef = {
   pointerId: number;
@@ -37,6 +39,7 @@ export function PetView(): JSX.Element {
   const snapshot = useSnapshot();
   const now = useNow(1000);
   const [bubble, setBubble] = useState<SpeechBubble | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [assetVariant, setAssetVariant] = useState(0);
   const [assetReplayKey, setAssetReplayKey] = useState(0);
   const [stateSignal, setStateSignal] = useState(0);
@@ -47,10 +50,12 @@ export function PetView(): JSX.Element {
     const offBubble = window.pawpal.onShowBubble(setBubble);
     const offHide = window.pawpal.onHideBubble(() => setBubble(null));
     const offPetState = window.pawpal.onPetState(() => setStateSignal((current) => current + 1));
+    const offPanel = window.pawpal.onPetPanelState(setPanelOpen);
     return () => {
       offBubble();
       offHide();
       offPetState();
+      offPanel();
     };
   }, []);
 
@@ -68,7 +73,7 @@ export function PetView(): JSX.Element {
       window.pawpal.petDragStop();
       return;
     }
-    if (clicked) window.pawpal.petClicked();
+    if (clicked) window.pawpal.petTogglePanel();
   }
 
   useEffect(() => {
@@ -141,31 +146,39 @@ export function PetView(): JSX.Element {
 
   return (
     <main
-      className="pet-shell"
+      className={`pet-shell${panelOpen ? " panel-open" : ""}`}
       aria-label="AI-WorkPet desktop pet"
       onContextMenu={(event) => {
         event.preventDefault();
         window.pawpal.petContextMenu();
       }}
     >
+      {panelOpen ? (
+        <HoverPanel onRequestClose={() => window.pawpal.petTogglePanel()} />
+      ) : null}
+
       {bubble ? (
-        <section className="speech-bubble">
-          <p>{bubble.message}</p>
-          {bubble.actions?.length ? (
-            <div className="bubble-actions">
-              {bubble.actions.map((action) => (
-                <button
-                  className={`bubble-button ${action.kind ?? "secondary"}`}
-                  key={action.id}
-                  onClick={() => window.pawpal.bubbleAction(action.id)}
-                  type="button"
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </section>
+        bubble.mode === "chat" && bubble.chat ? (
+          <BubbleChat sessionId={bubble.chat.sessionId} actions={bubble.actions} />
+        ) : (
+          <section className="speech-bubble">
+            <p>{bubble.message}</p>
+            {bubble.actions?.length ? (
+              <div className="bubble-actions">
+                {bubble.actions.map((action) => (
+                  <button
+                    className={`bubble-button ${action.kind ?? "secondary"}`}
+                    key={action.id}
+                    onClick={() => window.pawpal.bubbleAction(action.id)}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        )
       ) : null}
 
       {snapshot.focusActive ? (
