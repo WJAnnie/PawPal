@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { JSX, KeyboardEvent } from "react";
 import type {
   AiProvider,
@@ -95,6 +95,18 @@ export function ChatWindow(): JSX.Element {
       void refreshSessions();
     }
   }, [chat.messages, refreshSessions]);
+
+  // Pin the stream to the latest message / streaming chunk so the user never
+  // has to scroll manually to see new output. useLayoutEffect runs after the
+  // DOM mutation but before paint, so scrollHeight already reflects the new
+  // content. Depending on primitives (lengths) keeps this resilient regardless
+  // of how the hook batches updates.
+  const streamRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = streamRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chat.messages.length, chat.streaming?.partial.length, chat.error, activeSessionId]);
 
   const handleSend = useCallback(async (): Promise<void> => {
     if (!input.trim() || chat.isSending) return;
@@ -252,7 +264,7 @@ export function ChatWindow(): JSX.Element {
           </div>
         ) : null}
 
-        <div className="chat-stream" role="log" aria-live="polite">
+        <div className="chat-stream" role="log" aria-live="polite" ref={streamRef}>
           {renderableMessages.length === 0 && !chat.streaming ? (
             <div className="chat-empty">
               <p>开始一段新对话吧。</p>
