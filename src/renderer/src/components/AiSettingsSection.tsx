@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
 import { randomUUID } from "../randomId";
-import { syncTopLevelToActiveProfile, withActiveProfile } from "../../../shared/ai/profileSync";
+import { withActiveProfile } from "../../../shared/ai/profileSync";
 import type { AiProvider, AiSettings } from "../../../shared/ai/types";
 
 type TestState =
@@ -65,7 +65,7 @@ export function AiSettingsSection(): JSX.Element {
             p.id === current.activeProfileId ? { ...p, ...partial } : p
           ),
         };
-        return syncTopLevelToActiveProfile(updated);
+        return withActiveProfile(updated, updated.activeProfileId);
       });
       setSavingState("idle");
       setTest({ kind: "idle" });
