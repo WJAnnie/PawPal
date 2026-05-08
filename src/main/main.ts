@@ -297,9 +297,18 @@ function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
   };
 }
 
+function resolveStoredDisplay(displayId: number | undefined): Electron.Display {
+  if (displayId !== undefined) {
+    const match = screen.getAllDisplays().find((d) => d.id === displayId);
+    if (match) return match;
+  }
+  return screen.getPrimaryDisplay();
+}
+
 function initialPetBounds(): Electron.Rectangle {
-  const workArea = screen.getPrimaryDisplay().workArea;
   const stored = getSettingsStore().getPetPosition();
+  const display = resolveStoredDisplay(stored?.displayId);
+  const workArea = display.workArea;
   const fallback = {
     width: PET_WINDOW.width,
     height: PET_WINDOW.height,
@@ -318,7 +327,16 @@ function initialPetBounds(): Electron.Rectangle {
 function persistPetPosition(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const bounds = petWindow.getBounds();
-  getSettingsStore().setPetPosition({ x: bounds.x, y: bounds.y });
+  const center = {
+    x: bounds.x + Math.round(bounds.width / 2),
+    y: bounds.y + Math.round(bounds.height / 2)
+  };
+  const display = screen.getDisplayNearestPoint(center);
+  getSettingsStore().setPetPosition({
+    x: bounds.x,
+    y: bounds.y,
+    displayId: display.id
+  });
 }
 
 function createPetWindow(): void {
