@@ -51,6 +51,8 @@ import { ChatService } from "./ai/chatService";
 import type { AiSettings } from "../shared/ai/types";
 import { SettingsStore, type PetPosition } from "./settingsStore";
 import { StatsStore } from "./statsStore";
+import { resolvePassthrough, resolveStoredDisplayId } from "./windowDecisions";
+import type { PetWindowMode } from "./windowMode";
 import { VitalsStore, type RuntimeContext } from "./vitalsStore";
 import {
   COIN_REWARDS,
@@ -63,8 +65,6 @@ import {
   getItemById,
   visibleItemsFor
 } from "../shared/items";
-
-type PetWindowMode = "compact" | "panel" | "chat";
 
 app.setName(APP_NAME);
 
@@ -263,9 +263,7 @@ let rendererWantsPassthrough = true;
 
 function applyMousePassthrough(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
-  // Panel + chat windows are interactive surfaces — never let mouse events
-  // pass through them, regardless of what the renderer last requested.
-  const shouldPassthrough = petWindowMode === "compact" && rendererWantsPassthrough;
+  const shouldPassthrough = resolvePassthrough(petWindowMode, rendererWantsPassthrough);
   petWindow.setIgnoreMouseEvents(shouldPassthrough, { forward: true });
 }
 
@@ -312,11 +310,7 @@ function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
 }
 
 function resolveStoredDisplay(displayId: number | undefined): Electron.Display {
-  if (displayId !== undefined) {
-    const match = screen.getAllDisplays().find((d) => d.id === displayId);
-    if (match) return match;
-  }
-  return screen.getPrimaryDisplay();
+  return resolveStoredDisplayId(displayId, screen.getAllDisplays(), screen.getPrimaryDisplay());
 }
 
 function initialPetBounds(): Electron.Rectangle {
