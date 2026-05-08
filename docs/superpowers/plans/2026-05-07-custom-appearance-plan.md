@@ -4,7 +4,9 @@
 
 **Goal:** 让用户在桌面宠物应用里通过 UI 逐状态选本地 GIF/PNG/WEBP 文件,组成多套自定义形象并切换使用。
 
-**Architecture:** 三层结构(shared 纯函数 / main 端 store + IPC / renderer UI),通过新增的 `appearanceRegistry.ts` 适配层统一解析内置与自定义形象。错峰并行:阶段 A(纯前端 + 纯函数 + 单测)立即可启动,阶段 B(main 端 store)等 bug 修复分支 Phase 2 落地后再做,阶段 C(PetView + protocol 扩展)最后接通。
+**Architecture:** 三层结构(shared 纯函数 / main 端 store + IPC / renderer UI),通过新增的 `appearanceRegistry.ts` 适配层统一解析内置与自定义形象。错峰并行:阶段 A(纯前端 + 纯函数 + 单测)已完成并 rebase 到 main,阶段 B(main 端 store)在 bug 修复分支 Phase 2(`SettingsStore`/`StatsStore` 抽出)+ Phase 4(`displayId`)落地到 `main` HEAD `0320ff1` 后启动,阶段 C(PetView + protocol 扩展)最后接通。
+
+**自定义形象数据存储决策(2026-05-08 锁定):** 跟 `petPosition` 一样在 `pawpal` electron-store 的 root 加独立 key `customAppearances`,**不**并入 `Settings`。理由:manifest 大且语义独立,避免每次 `settings:updated` 序列化整坨 manifest;也避免被 `SettingsStore.normalise` 的 `resolvePetAppearanceId` 路径影响。`customAppearanceStore` 自己 `new Store<RootStoreSchema>({ name: "pawpal" })` 复用同一文件,通过 `customAppearances:updated` IPC 事件广播变更。
 
 **Tech Stack:** TypeScript, Electron, React 19, vitest 4.1.5, electron-store, pnpm 9.15.9
 
@@ -1302,30 +1304,34 @@ git push -u origin feat/custom-appearance
 
 Expected: 分支推送成功。
 
-- [ ] **Step 4: 阶段 A 完成,等待节点**
+- [x] **Step 4: 阶段 A 完成,等待节点** _(2026-05-07 完成,8 commit 推到 `origin/worktree-feat-custom-appearance`)_
 
-阶段 A 至此完成。等待 bug 修复分支的 Phase 2(抽 settingsStore + statsStore)落地到 main 后,再启动阶段 B。
+阶段 A 至此完成。**2026-05-08 update:** Phase 2(`SettingsStore`+`StatsStore`)+ Phase 4(`displayId`)已落地到 `main` HEAD `0320ff1`,worktree 已 rebase(7 commit,vitest pin 被自动跳过 — 主线 commit `48e33f8` 内容相同),106 tests / 9 files passed。阶段 B 启动条件全部满足。
 
-可以在等待期做的事:
+等待期已处理(可跳过):
 - 追加更多单元测试覆盖 registry 的边角场景
 - 给 AppearanceManager / AppearanceEditor 加 CSS(在 styles.css 加新 class)
 - 写阶段 B 的 IPC handler 接口的 mock 版本,让 UI 用 mock 走流程
 
 ---
 
-## 阶段 B:main 端 store + IPC(等 bug 修复 Phase 2)
+## 阶段 B:main 端 store + IPC
 
-**启动条件:** bug 修复分支 Phase 2(`抽 settingsStore + statsStore`)合到 main,且 `feat/custom-appearance` 分支已经 rebase 到最新 main。
+**启动条件:** ✅ 全部满足(2026-05-08)
+- ✅ Phase 2(`SettingsStore`+`StatsStore`)合到 `main`
+- ✅ Phase 4(`displayId` on `PetPosition`)合到 `main`
+- ✅ `worktree-feat-custom-appearance` 已 rebase 到 `main` HEAD `0320ff1`
+- ✅ 106 tests / 9 files passed,typecheck + build 全绿
 
 **预期工作:**
 
-### Task B1:rebase 到最新 main 并解冲突
+### Task B1:rebase 到最新 main 并解冲突 _(已完成 2026-05-08)_
 
-- [ ] `git fetch origin && git rebase origin/main`
-- [ ] 解决 `package.json` 冲突(我们 Task A1 加的 vitest 与 bug 修复分支可能冲突 — 取并集)
-- [ ] 解决其他冲突(预期较少,因为阶段 A 没动 main 端文件)
-- [ ] `pnpm install && pnpm test && pnpm typecheck` 全绿
-- [ ] `git push --force-with-lease`
+- [x] `git rebase main`(主工作树本地 main 已含所有 Phase 2/4 commit,无需 fetch)
+- [x] vitest 重复 commit 自动跳过(`e29131e` ≡ 主线 `48e33f8`)
+- [x] 0 其他冲突(阶段 A 没动 main 端文件,符合 plan 设计)
+- [x] `pnpm test`(106/106) + `pnpm typecheck`(green)+ `pnpm build`(green)
+- [x] `git push --force-with-lease origin worktree-feat-custom-appearance`(`9f48bf7...b5c70ab`)
 
 ### Task B2:`src/main/customAppearanceStore.ts` 实现
 
@@ -1337,7 +1343,9 @@ Expected: 分支推送成功。
 - `list()` / `create(name)` / `assignAsset(bareId, state, srcPath)` / `clearAsset(bareId, state)` / `rename(bareId, newName)` / `remove(bareId)` / `getAllManifests()`
 - `assignAsset` 内部:`fs.copyFile(srcPath, userData/customAssets/<bareId>/<state>.<ext>)`,旧文件存在则先 unlink,再 update manifest 持久化
 - 启动扫描清理孤儿目录 / 孤儿 config 项
-- 接 settingsStore(rebase 后已存在),customs 持久化挂在 settingsStore 旁边或独立 customStore — 跟 bug 修复分支 Phase 2 选定的 store 模式保持一致
+- **持久化策略**(已锁定):`customAppearanceStore` 自己 `new Store<RootStoreSchema>({ name: "pawpal" })` 复用同一 electron-store 文件,在 root 加新 key `customAppearances: Record<string, CustomAppearanceManifest>`。**不修改 `SettingsStore`**(零侵入 Phase 2),也不放进 `Settings` 字段(避免被 `normalise` 路径影响 + 减小 settings 序列化体积)。
+- **RootStoreSchema 扩展**:`customAppearanceStore.ts` 顶部声明本地 `RootStoreSchema { settings?, petPosition?, statsHistory?, stats?, customAppearances? }`,与 SettingsStore/StatsStore 的 schema 兼容(electron-store 是 schema-superset-tolerant 的,各 store 只读自己关心的 key)。
+- **变更广播**:每次 mutate 后通过 `appearance:updated` 事件经主进程 webContents 广播给 renderer(由 IPC handler 触发,Store 自身不知道 IPC 存在,保持可测试性)。
 
 集成测试在临时 `userData` 目录(用 `os.tmpdir()` + `mkdtempSync`)跑,覆盖 spec §8.2 全部场景。
 
