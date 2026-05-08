@@ -13,12 +13,6 @@ import {
   shell,
   Tray
 } from "electron";
-import Store from "electron-store";
-import {
-  createEmptyStats,
-  DEFAULT_SETTINGS,
-  todayKey
-} from "../shared/constants";
 import { i18n, pick, resolveLanguage } from "../shared/i18n";
 import { resolvePetAppearanceId, getPetSpecies } from "../shared/petAppearances";
 import type {
@@ -29,7 +23,6 @@ import type {
   PetFacing,
   PetState,
   Settings,
-  StatsHistory,
   SpeechBubble,
   TodayStats
 } from "../shared/types";
@@ -48,8 +41,7 @@ import {
   PRELOAD_PATH,
   RELEASES_URL,
   RENDERER_HTML_PATH,
-  SETTINGS_WINDOW,
-  STORE_NAME
+  SETTINGS_WINDOW
 } from "./config";
 import { classifyDistraction, isPermissionError, readActiveWindow } from "./distraction";
 import { createTrayImage } from "./trayIcon";
@@ -57,6 +49,8 @@ import { AiSettingsStore } from "./ai/settingsStore";
 import { ChatHistoryStore } from "./ai/chatHistory";
 import { ChatService } from "./ai/chatService";
 import type { AiSettings } from "../shared/ai/types";
+import { SettingsStore, type PetPosition } from "./settingsStore";
+import { StatsStore } from "./statsStore";
 import { VitalsStore, type RuntimeContext } from "./vitalsStore";
 import {
   COIN_REWARDS,
@@ -70,28 +64,9 @@ import {
   visibleItemsFor
 } from "../shared/items";
 
-type PetPosition = {
-  x: number;
-  y: number;
-};
-
-type StoreSchema = {
-  settings: Settings;
-  stats: TodayStats;
-  statsHistory: StatsHistory;
-  petPosition?: PetPosition;
-};
+type PetWindowMode = "compact" | "panel" | "chat";
 
 app.setName(APP_NAME);
-
-const store = new Store<StoreSchema>({
-  name: STORE_NAME,
-  defaults: {
-    settings: DEFAULT_SETTINGS,
-    stats: createEmptyStats(),
-    statsHistory: {}
-  }
-});
 
 let petWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -115,7 +90,6 @@ let breakDueAt: number | null = null;
 let hydrationDueAt: number | null = null;
 let focusEndsAt: number | null = null;
 let bubbleTimer: NodeJS.Timeout | null = null;
-type PetWindowMode = "compact" | "panel" | "chat";
 let petWindowMode: PetWindowMode = "compact";
 let vitalsTickTimer: NodeJS.Timeout | null = null;
 let lastUserInteractionAt = Date.now();
@@ -136,14 +110,20 @@ let distractionStatus: DistractionStatus = {
   error: null
 };
 
+let settingsStoreSingleton: SettingsStore | null = null;
+function getSettingsStore(): SettingsStore {
+  if (!settingsStoreSingleton) settingsStoreSingleton = new SettingsStore();
+  return settingsStoreSingleton;
+}
+
+let statsStoreSingleton: StatsStore | null = null;
+function getStatsStore(): StatsStore {
+  if (!statsStoreSingleton) statsStoreSingleton = new StatsStore();
+  return statsStoreSingleton;
+}
+
 function getSettings(): Settings {
-  const stored = store.get("settings");
-  return {
-    ...DEFAULT_SETTINGS,
-    ...stored,
-    language: resolveLanguage(stored.language),
-    petAppearanceId: resolvePetAppearanceId(stored.petAppearanceId)
-  };
+  return getSettingsStore().get();
 }
 
 function text(): ReturnType<typeof i18n> {
@@ -151,12 +131,7 @@ function text(): ReturnType<typeof i18n> {
 }
 
 function setSettings(next: Settings): void {
-  const normalized = {
-    ...next,
-    language: resolveLanguage(next.language),
-    petAppearanceId: resolvePetAppearanceId(next.petAppearanceId)
-  };
-  store.set("settings", normalized);
+  const normalized = getSettingsStore().set(next);
   sendToAll("settings:updated", normalized);
   settingsWindow?.setTitle(`${APP_NAME} ${text().menu.settings}`);
   scheduleReminderTimers();
@@ -164,57 +139,18 @@ function setSettings(next: Settings): void {
   updateTrayMenu();
 }
 
-function getStatsHistory(): StatsHistory {
-  return store.get("statsHistory", {});
-}
-
-function isSameStats(left: TodayStats | undefined, right: TodayStats): boolean {
-  return Boolean(
-    left &&
-      left.date === right.date &&
-      left.breaksTaken === right.breaksTaken &&
-      left.watersLogged === right.watersLogged &&
-      left.focusMinutes === right.focusMinutes &&
-      left.focusWarnings === right.focusWarnings
-  );
-}
-
-function saveStatsToHistory(stats: TodayStats): void {
-  if (!stats.date) return;
-  const history = getStatsHistory();
-  if (isSameStats(history[stats.date], stats)) return;
-  store.set("statsHistory", {
-    ...history,
-    [stats.date]: stats
-  });
-}
-
 function getStats(): TodayStats {
-  const today = todayKey();
-  const stats = store.get("stats", createEmptyStats());
-  if (stats.date !== today) {
-    saveStatsToHistory(stats);
-    const current = getStatsHistory()[today] ?? createEmptyStats(today);
-    store.set("stats", current);
-    saveStatsToHistory(current);
-    return current;
-  }
-  saveStatsToHistory(stats);
-  return stats;
+  return getStatsStore().getToday();
 }
 
 function updateStats(mutator: (stats: TodayStats) => TodayStats): void {
-  const next = mutator(getStats());
-  store.set("stats", next);
-  saveStatsToHistory(next);
+  const next = getStatsStore().updateToday(mutator);
   sendToAll("stats:updated", next);
 }
 
 function resetTodayStats(): void {
   breakMutedToday = false;
-  const reset = createEmptyStats();
-  store.set("stats", reset);
-  saveStatsToHistory(reset);
+  const reset = getStatsStore().resetToday();
   sendToAll("stats:updated", reset);
 }
 
@@ -226,7 +162,7 @@ function snapshot(): AppSnapshot {
     },
     settings: getSettings(),
     stats: getStats(),
-    statsHistory: getStatsHistory(),
+    statsHistory: getStatsStore().getHistory(),
     timers: {
       breakDueAt,
       hydrationDueAt,
@@ -363,7 +299,7 @@ function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
 
 function initialPetBounds(): Electron.Rectangle {
   const workArea = screen.getPrimaryDisplay().workArea;
-  const stored = store.get("petPosition");
+  const stored = getSettingsStore().getPetPosition();
   const fallback = {
     width: PET_WINDOW.width,
     height: PET_WINDOW.height,
@@ -382,7 +318,7 @@ function initialPetBounds(): Electron.Rectangle {
 function persistPetPosition(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const bounds = petWindow.getBounds();
-  store.set("petPosition", { x: bounds.x, y: bounds.y });
+  getSettingsStore().setPetPosition({ x: bounds.x, y: bounds.y });
 }
 
 function createPetWindow(): void {
