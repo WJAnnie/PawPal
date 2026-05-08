@@ -7,6 +7,14 @@ import type { Settings } from "../shared/types";
 export type PetPosition = {
   x: number;
   y: number;
+  /**
+   * Electron `Display.id` of the screen the pet was on when this position
+   * was saved. Optional so old installs (which only stored `{x, y}`) keep
+   * loading; on next save the displayId is backfilled. Reserved for the
+   * caller to read with `screen.getAllDisplays()` lookup — SettingsStore
+   * itself never resolves displays.
+   */
+  displayId?: number;
 };
 
 interface RootStoreSchema {

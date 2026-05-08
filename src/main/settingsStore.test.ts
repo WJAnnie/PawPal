@@ -168,4 +168,26 @@ describe("SettingsStore petPosition", () => {
     store.setPetPosition({ x: 9, y: 9 });
     expect(store.getPetPosition()).toEqual({ x: 9, y: 9 });
   });
+
+  it("round-trips a position with displayId", () => {
+    store.setPetPosition({ x: 100, y: 200, displayId: 12345 });
+    expect(store.getPetPosition()).toEqual({ x: 100, y: 200, displayId: 12345 });
+  });
+
+  it("reads a legacy position without displayId as undefined displayId", () => {
+    fake.set("petPosition", { x: 50, y: 60 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fresh = new SettingsStore(fake as any);
+    const pos = fresh.getPetPosition();
+    expect(pos).toEqual({ x: 50, y: 60 });
+    expect(pos?.displayId).toBeUndefined();
+  });
+
+  it("dropping displayId on second write replaces previous", () => {
+    store.setPetPosition({ x: 1, y: 2, displayId: 99 });
+    store.setPetPosition({ x: 3, y: 4 });
+    const got = store.getPetPosition();
+    expect(got).toEqual({ x: 3, y: 4 });
+    expect(got?.displayId).toBeUndefined();
+  });
 });
