@@ -253,6 +253,20 @@ function setPetWindowMode(mode: PetWindowMode): void {
     height: target.height
   });
   petWindow.setBounds(next);
+  applyMousePassthrough();
+}
+
+// Renderer says "the cursor is over a hit-area" by sending false; "the cursor
+// left the hit-area" by sending true. Stored separately from the resolved
+// state so panel/chat mode can override without losing the renderer's intent.
+let rendererWantsPassthrough = true;
+
+function applyMousePassthrough(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  // Panel + chat windows are interactive surfaces — never let mouse events
+  // pass through them, regardless of what the renderer last requested.
+  const shouldPassthrough = petWindowMode === "compact" && rendererWantsPassthrough;
+  petWindow.setIgnoreMouseEvents(shouldPassthrough, { forward: true });
 }
 
 function togglePetPanel(): void {
@@ -365,6 +379,11 @@ function createPetWindow(): void {
   });
 
   petWindow.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
+  // Default to mouse-event passthrough so the transparent corners of the pet
+  // window don't block the desktop. The renderer flips this off when the
+  // cursor enters the sprite / bubble / panel hit-areas (forward:true keeps
+  // mousemove flowing so the renderer can detect re-entry).
+  petWindow.setIgnoreMouseEvents(true, { forward: true });
   if (process.platform === "darwin") {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
@@ -1340,6 +1359,10 @@ function registerIpc(): void {
     startPetDrag(offset)
   );
   ipcMain.on("pet:drag-stop", stopPetDrag);
+  ipcMain.on("pet:set-mouse-passthrough", (_event, value: boolean) => {
+    rendererWantsPassthrough = Boolean(value);
+    applyMousePassthrough();
+  });
   ipcMain.on("bubble:action", (_event, actionId: string) => {
     lastUserInteractionAt = Date.now();
     handleBubbleAction(actionId);

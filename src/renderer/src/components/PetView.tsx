@@ -59,6 +59,17 @@ export function PetView(): JSX.Element {
     };
   }, []);
 
+  // Default to mouse passthrough so the transparent corners don't block the
+  // desktop. Each hit-area below toggles this off via onMouseEnter and back
+  // on via onMouseLeave. The setIgnoreMouseEvents(forward:true) on main
+  // keeps mousemove flowing so re-entry events still arrive after passthrough
+  // is enabled.
+  const enterHitArea = (): void => window.pawpal.petSetMousePassthrough(false);
+  const leaveHitArea = (): void => window.pawpal.petSetMousePassthrough(true);
+  useEffect(() => {
+    window.pawpal.petSetMousePassthrough(true);
+  }, []);
+
   const state = snapshot.petState;
   const altText = `AI-WorkPet ${state}`;
   const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
@@ -161,7 +172,11 @@ export function PetView(): JSX.Element {
         bubble.mode === "chat" && bubble.chat ? (
           <BubbleChat sessionId={bubble.chat.sessionId} actions={bubble.actions} />
         ) : (
-          <section className="speech-bubble">
+          <section
+            className="speech-bubble"
+            onMouseEnter={enterHitArea}
+            onMouseLeave={leaveHitArea}
+          >
             <p>{bubble.message}</p>
             {bubble.actions?.length ? (
               <div className="bubble-actions">
@@ -182,7 +197,7 @@ export function PetView(): JSX.Element {
       ) : null}
 
       {snapshot.focusActive ? (
-        <div className="focus-badge">
+        <div className="focus-badge" onMouseEnter={enterHitArea} onMouseLeave={leaveHitArea}>
           <span>{labels.focus}</span>
           <strong>{formatFocusCountdown(snapshot.timers.focusEndsAt, now)}</strong>
         </div>
@@ -192,6 +207,8 @@ export function PetView(): JSX.Element {
         className={`pet-button state-${state} ${facingClass} ${
           asset.isPlaceholder ? "placeholder-asset" : ""
         }`}
+        onMouseEnter={enterHitArea}
+        onMouseLeave={leaveHitArea}
         onPointerCancel={cancelPointer}
         onPointerDown={startPointer}
         onLostPointerCapture={() => finishPointerDrag(false)}

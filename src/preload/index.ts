@@ -89,6 +89,8 @@ const api = {
   petDragStart: (offset: { offsetX: number; offsetY: number }): void =>
     ipcRenderer.send("pet:drag-start", offset),
   petDragStop: (): void => ipcRenderer.send("pet:drag-stop"),
+  petSetMousePassthrough: (passthrough: boolean): void =>
+    ipcRenderer.send("pet:set-mouse-passthrough", passthrough),
   bubbleAction: (actionId: string): void => ipcRenderer.send("bubble:action", actionId),
   updateSettings: (settings: Partial<Settings>): void =>
     ipcRenderer.send("settings:update", settings),
