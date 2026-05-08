@@ -7,6 +7,7 @@ import { getPetAsset } from "../assets";
 import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
 import { AiSettingsSection } from "./AiSettingsSection";
+import { AppearanceManager } from "./AppearanceManager";
 
 type SettingsCopy = ReturnType<typeof i18n>["settings"];
 
@@ -297,6 +298,16 @@ export function SettingsView(): JSX.Element {
               />
             ))}
           </div>
+        </div>
+        <div className="pref-block">
+          <details className="pref-block__advanced">
+            <summary>自定义形象 (实验)</summary>
+            <AppearanceManager
+              language={language}
+              selectedId={draft.petAppearanceId}
+              onSelect={(id) => updateDraft({ petAppearanceId: id })}
+            />
+          </details>
         </div>
       </section>
 
