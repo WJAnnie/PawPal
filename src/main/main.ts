@@ -1,9 +1,11 @@
-import { join, resolve, sep } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
+import { statSync } from "node:fs";
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   nativeTheme,
@@ -51,6 +53,7 @@ import { ChatService } from "./ai/chatService";
 import type { AiSettings } from "../shared/ai/types";
 import { SettingsStore, type PetPosition } from "./settingsStore";
 import { StatsStore } from "./statsStore";
+import { CustomAppearanceStore } from "./customAppearanceStore";
 import { VitalsStore, type RuntimeContext } from "./vitalsStore";
 import {
   COIN_REWARDS,
@@ -120,6 +123,16 @@ let statsStoreSingleton: StatsStore | null = null;
 function getStatsStore(): StatsStore {
   if (!statsStoreSingleton) statsStoreSingleton = new StatsStore();
   return statsStoreSingleton;
+}
+
+let customAppearanceStoreSingleton: CustomAppearanceStore | null = null;
+function getCustomAppearanceStore(): CustomAppearanceStore {
+  if (!customAppearanceStoreSingleton) {
+    customAppearanceStoreSingleton = new CustomAppearanceStore({
+      userDataDir: app.getPath("userData")
+    });
+  }
+  return customAppearanceStoreSingleton;
 }
 
 function getSettings(): Settings {
@@ -1357,6 +1370,8 @@ function registerIpc(): void {
   // AI subsystem (see docs/ai-design.md). Lazy-initialised so that any error
   // here does not break PawPal's existing reminder / focus / animation core.
   registerAiIpc();
+
+  registerAppearanceIpc();
 }
 
 let aiServiceSingleton: ChatService | null = null;
@@ -1735,6 +1750,72 @@ function registerAiIpc(): void {
       frisbeeWindow.close();
     }
   });
+}
+
+const ALLOWED_APPEARANCE_EXTS = new Set(["gif", "png", "webp"]);
+const APPEARANCE_MAX_BYTES = 10 * 1024 * 1024;
+
+function registerAppearanceIpc(): void {
+  ipcMain.handle("appearance:list", () =>
+    getCustomAppearanceStore().list()
+  );
+
+  ipcMain.handle("appearance:get-all", () =>
+    getCustomAppearanceStore().getAllManifests()
+  );
+
+  ipcMain.handle("appearance:create", (_event, name: string) => {
+    const m = getCustomAppearanceStore().create(name);
+    sendToAll("appearance:updated");
+    return m;
+  });
+
+  ipcMain.handle("appearance:rename", (_event, bareId: string, newName: string) => {
+    const m = getCustomAppearanceStore().rename(bareId, newName);
+    sendToAll("appearance:updated");
+    return m;
+  });
+
+  ipcMain.handle("appearance:delete", (_event, bareId: string) => {
+    getCustomAppearanceStore().remove(bareId);
+    sendToAll("appearance:updated");
+  });
+
+  ipcMain.handle(
+    "appearance:clear-asset",
+    (_event, bareId: string, state: PetState) => {
+      const m = getCustomAppearanceStore().clearAsset(bareId, state);
+      sendToAll("appearance:updated");
+      return m;
+    }
+  );
+
+  ipcMain.handle(
+    "appearance:pick-and-assign",
+    async (_event, bareId: string, state: PetState) => {
+      const result = await dialog.showOpenDialog({
+        title: text().menu.settings,
+        properties: ["openFile"],
+        filters: [{ name: "Image", extensions: ["gif", "png", "webp"] }]
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      const srcPath = result.filePaths[0];
+
+      const ext = extname(srcPath).toLowerCase().replace(/^\./, "");
+      if (!ALLOWED_APPEARANCE_EXTS.has(ext)) {
+        throw new Error(`Unsupported file type: .${ext}`);
+      }
+      const stat = statSync(srcPath);
+      if (stat.size > APPEARANCE_MAX_BYTES) {
+        const mb = (stat.size / 1024 / 1024).toFixed(1);
+        throw new Error(`File too large (${mb}MB > 10MB limit)`);
+      }
+
+      const m = getCustomAppearanceStore().assignAsset(bareId, state, srcPath);
+      sendToAll("appearance:updated");
+      return m;
+    }
+  );
 }
 
 protocol.registerSchemesAsPrivileged([

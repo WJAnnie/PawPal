@@ -16,6 +16,7 @@ import type {
   TodayStats
 } from "../shared/types";
 import type { PetVitals, PendingGift } from "../shared/vitals";
+import type { CustomAppearanceManifest } from "../shared/customAppearance";
 
 type Unsubscribe = () => void;
 
@@ -79,6 +80,31 @@ const frisbee = {
   close: (): void => ipcRenderer.send("frisbee:close"),
 };
 
+const appearance = {
+  list: (): Promise<CustomAppearanceManifest[]> =>
+    ipcRenderer.invoke("appearance:list"),
+  getAllManifests: (): Promise<Record<string, CustomAppearanceManifest>> =>
+    ipcRenderer.invoke("appearance:get-all"),
+  create: (name: string): Promise<CustomAppearanceManifest> =>
+    ipcRenderer.invoke("appearance:create", name),
+  rename: (bareId: string, newName: string): Promise<CustomAppearanceManifest> =>
+    ipcRenderer.invoke("appearance:rename", bareId, newName),
+  remove: (bareId: string): Promise<void> =>
+    ipcRenderer.invoke("appearance:delete", bareId),
+  clearAsset: (
+    bareId: string,
+    state: PetState
+  ): Promise<CustomAppearanceManifest> =>
+    ipcRenderer.invoke("appearance:clear-asset", bareId, state),
+  pickAndAssign: (
+    bareId: string,
+    state: PetState
+  ): Promise<CustomAppearanceManifest | null> =>
+    ipcRenderer.invoke("appearance:pick-and-assign", bareId, state),
+  onUpdated: (callback: () => void): Unsubscribe =>
+    onChannel("appearance:updated", callback),
+};
+
 const api = {
   getSnapshot: (): Promise<AppSnapshot> => ipcRenderer.invoke("app:get-snapshot"),
   openReleaseNotes: (): void => ipcRenderer.send("app:open-release-notes"),
@@ -121,6 +147,8 @@ const api = {
   vitals,
   // Frisbee mini-game window IPC
   frisbee,
+  // Custom appearance manager (Stage B)
+  appearance,
 };
 
 contextBridge.exposeInMainWorld("pawpal", api);
