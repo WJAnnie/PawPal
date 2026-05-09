@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Language, PetAppearanceId } from "../../../shared/types";
+import type { Language, PetAppearanceId, PetState } from "../../../shared/types";
 import type { CustomAppearanceManifest } from "../../../shared/customAppearance";
 import { createAppearanceRegistry } from "../../../shared/appearanceRegistry";
 import { AppearanceEditor } from "./AppearanceEditor";
@@ -8,13 +8,22 @@ interface AppearanceManagerProps {
   language: Language;
   selectedId: PetAppearanceId;
   // Stage A: undefined, Manager simulates with local state.
-  // Stage B: customs come from window.api.appearance.list().
+  // Stage B: customs come from window.pawpal.appearance.list().
   customs?: Record<string, CustomAppearanceManifest>;
   onSelect: (id: PetAppearanceId) => void;
   onCreate?: (name: string) => Promise<CustomAppearanceManifest> | CustomAppearanceManifest;
   onRename?: (bareId: string, newName: string) => void;
   onDelete?: (bareId: string) => void;
   onUpdateManifest?: (manifest: CustomAppearanceManifest) => void;
+  // Stage B: per-state asset operations forwarded to AppearanceEditor.
+  onPickAsset?: (
+    bareId: string,
+    state: PetState
+  ) => Promise<CustomAppearanceManifest | null>;
+  onClearAsset?: (
+    bareId: string,
+    state: PetState
+  ) => Promise<CustomAppearanceManifest>;
 }
 
 export function AppearanceManager({
@@ -26,6 +35,8 @@ export function AppearanceManager({
   onRename,
   onDelete,
   onUpdateManifest,
+  onPickAsset,
+  onClearAsset,
 }: AppearanceManagerProps) {
   // Stage A: when customs is not supplied (no IPC yet), use local state to make UI clickable.
   const [localCustoms, setLocalCustoms] = useState<Record<string, CustomAppearanceManifest>>({});
@@ -109,6 +120,16 @@ export function AppearanceManager({
           manifest={editing}
           onSave={handleEditorSave}
           onCancel={() => setEditingBareId(null)}
+          onPickAsset={
+            onPickAsset
+              ? (state) => onPickAsset(editingBareId, state)
+              : undefined
+          }
+          onClearAsset={
+            onClearAsset
+              ? (state) => onClearAsset(editingBareId, state)
+              : undefined
+          }
         />
       );
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PetState } from "../../../shared/types";
 import type { CustomAppearanceManifest } from "../../../shared/customAppearance";
 import { validateCustomAppearanceName } from "../../../shared/customAppearance";
@@ -25,9 +25,9 @@ interface AppearanceEditorProps {
   onSave: (next: CustomAppearanceManifest) => void;
   onCancel: () => void;
   // Stage A: optional, falls back to alert stub.
-  // Stage B: wired to window.api.appearance IPC.
-  onPickAsset?: (state: PetState) => void;
-  onClearAsset?: (state: PetState) => void;
+  // Stage B: returns the updated manifest from main-process IPC; null when user cancels picker.
+  onPickAsset?: (state: PetState) => Promise<CustomAppearanceManifest | null>;
+  onClearAsset?: (state: PetState) => Promise<CustomAppearanceManifest>;
 }
 
 export function AppearanceEditor({
@@ -38,7 +38,15 @@ export function AppearanceEditor({
   onClearAsset,
 }: AppearanceEditorProps) {
   const [name, setName] = useState(manifest.name);
-  const [assets, setAssets] = useState(manifest.assets);
+  // Mirror of latest persisted manifest. Stage B: each pick/clear updates from IPC reply
+  // and main-process is source of truth. Stage A: local-only updates.
+  const [currentAssets, setCurrentAssets] = useState(manifest.assets);
+
+  // If parent feeds a fresher manifest (e.g. appearance:updated event), keep mirror in sync
+  // unless the user is mid-edit on the name field.
+  useEffect(() => {
+    setCurrentAssets(manifest.assets);
+  }, [manifest]);
 
   const nameValidation = validateCustomAppearanceName(name);
 
@@ -47,14 +55,20 @@ export function AppearanceEditor({
     onSave({
       ...manifest,
       name: name.trim(),
-      assets,
+      assets: currentAssets,
       updatedAt: Date.now(),
     });
   };
 
-  const handlePick = (state: PetState) => {
+  const handlePick = async (state: PetState) => {
     if (onPickAsset) {
-      onPickAsset(state);
+      try {
+        const updated = await onPickAsset(state);
+        if (updated) setCurrentAssets(updated.assets);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        window.alert(`选择文件失败:${msg}`);
+      }
     } else {
       window.alert(
         `[stub] 选择 ${state} 状态的素材文件 — 等阶段 B 接通 IPC 后生效`
@@ -62,15 +76,22 @@ export function AppearanceEditor({
     }
   };
 
-  const handleClear = (state: PetState) => {
+  const handleClear = async (state: PetState) => {
     if (onClearAsset) {
-      onClearAsset(state);
+      try {
+        const updated = await onClearAsset(state);
+        setCurrentAssets(updated.assets);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        window.alert(`清除失败:${msg}`);
+      }
+    } else {
+      setCurrentAssets((prev) => {
+        const next = { ...prev };
+        delete next[state];
+        return next;
+      });
     }
-    setAssets((prev) => {
-      const next = { ...prev };
-      delete next[state];
-      return next;
-    });
   };
 
   return (
@@ -95,7 +116,7 @@ export function AppearanceEditor({
 
       <ul className="appearance-editor__states">
         {ALL_STATES.map((state) => {
-          const fileName = assets[state];
+          const fileName = currentAssets[state];
           return (
             <li key={state} className="appearance-editor__state-row">
               <span className="appearance-editor__state-label">{state}</span>
@@ -105,14 +126,14 @@ export function AppearanceEditor({
               <button
                 type="button"
                 className="appearance-editor__pick-btn"
-                onClick={() => handlePick(state)}
+                onClick={() => void handlePick(state)}
               >
                 选择文件
               </button>
               <button
                 type="button"
                 className="appearance-editor__clear-btn"
-                onClick={() => handleClear(state)}
+                onClick={() => void handleClear(state)}
                 disabled={!fileName}
               >
                 清除

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { JSX, ReactNode } from "react";
 import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../../shared/i18n";
 import { petAppearanceOptions, resolvePetAppearanceId } from "../../../shared/petAppearances";
-import type { DemoTrigger, PetAppearanceId, Settings } from "../../../shared/types";
+import type { DemoTrigger, PetAppearanceId, PetState, Settings } from "../../../shared/types";
+import type { CustomAppearanceManifest } from "../../../shared/customAppearance";
 import { getPetAsset } from "../assets";
 import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
@@ -239,6 +240,55 @@ export function SettingsView(): JSX.Element {
     setSettingsDirty(true);
   }
 
+  // Custom appearance manifest registry. Source of truth is the main process; we
+  // mirror it here for the AppearanceManager and refresh on appearance:updated.
+  const [customs, setCustoms] = useState<Record<string, CustomAppearanceManifest>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    void window.pawpal.appearance.getAllManifests().then((all) => {
+      if (mounted) setCustoms(all);
+    });
+    const unsubscribe = window.pawpal.appearance.onUpdated(() => {
+      void window.pawpal.appearance.getAllManifests().then((all) => {
+        if (mounted) setCustoms(all);
+      });
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const handleAppearanceCreate = (name: string): Promise<CustomAppearanceManifest> =>
+    window.pawpal.appearance.create(name);
+
+  const handleAppearanceRename = (bareId: string, newName: string): void => {
+    void window.pawpal.appearance.rename(bareId, newName).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      window.alert(`重命名失败:${msg}`);
+    });
+  };
+
+  const handleAppearanceDelete = (bareId: string): void => {
+    void window.pawpal.appearance.remove(bareId).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      window.alert(`删除失败:${msg}`);
+    });
+  };
+
+  const handleAppearancePickAsset = (
+    bareId: string,
+    state: PetState
+  ): Promise<CustomAppearanceManifest | null> =>
+    window.pawpal.appearance.pickAndAssign(bareId, state);
+
+  const handleAppearanceClearAsset = (
+    bareId: string,
+    state: PetState
+  ): Promise<CustomAppearanceManifest> =>
+    window.pawpal.appearance.clearAsset(bareId, state);
+
   return (
     <main className="prefs">
       <header className="prefs__head">
@@ -305,7 +355,13 @@ export function SettingsView(): JSX.Element {
             <AppearanceManager
               language={language}
               selectedId={draft.petAppearanceId}
+              customs={customs}
               onSelect={(id) => updateDraft({ petAppearanceId: id })}
+              onCreate={handleAppearanceCreate}
+              onRename={handleAppearanceRename}
+              onDelete={handleAppearanceDelete}
+              onPickAsset={handleAppearancePickAsset}
+              onClearAsset={handleAppearanceClearAsset}
             />
           </details>
         </div>
