@@ -138,6 +138,7 @@ export function AppearanceManager({
       return (
         <AppearanceEditor
           manifest={editing}
+          language={language}
           onSave={handleEditorSave}
           onCancel={() => setEditingBareId(null)}
           onPickAsset={

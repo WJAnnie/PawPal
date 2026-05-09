@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PetState } from "../../../shared/types";
+import type { Language, PetState } from "../../../shared/types";
 import type { CustomAppearanceManifest } from "../../../shared/customAppearance";
 import { validateCustomAppearanceName } from "../../../shared/customAppearance";
 
@@ -20,8 +20,26 @@ const ALL_STATES: PetState[] = [
   "sleeping",
 ];
 
+const STATE_LABELS: Record<PetState, Record<Language, string>> = {
+  idle:            { "zh-CN": "待机",       en: "Idle" },
+  sitting:         { "zh-CN": "坐着",       en: "Sitting" },
+  happy:           { "zh-CN": "开心",       en: "Happy" },
+  breakPrompt:     { "zh-CN": "提醒休息",   en: "Break prompt" },
+  breakRunning:    { "zh-CN": "休息中",     en: "On break" },
+  breakDone:       { "zh-CN": "休息完成",   en: "Break done" },
+  hydrationPrompt: { "zh-CN": "提醒喝水",   en: "Hydration prompt" },
+  drinking:        { "zh-CN": "喝水中",     en: "Drinking" },
+  hydrationDone:   { "zh-CN": "喝水完成",   en: "Hydration done" },
+  focusGuard:      { "zh-CN": "专注守护",   en: "Focus guard" },
+  focusAlert:      { "zh-CN": "专注警报",   en: "Focus alert" },
+  focusDone:       { "zh-CN": "专注完成",   en: "Focus done" },
+  sad:             { "zh-CN": "难过",       en: "Sad" },
+  sleeping:        { "zh-CN": "睡觉",       en: "Sleeping" },
+};
+
 interface AppearanceEditorProps {
   manifest: CustomAppearanceManifest;
+  language: Language;
   onSave: (next: CustomAppearanceManifest) => void;
   onCancel: () => void;
   // Stage A: optional, falls back to alert stub.
@@ -32,6 +50,7 @@ interface AppearanceEditorProps {
 
 export function AppearanceEditor({
   manifest,
+  language,
   onSave,
   onCancel,
   onPickAsset,
@@ -119,7 +138,9 @@ export function AppearanceEditor({
           const fileName = currentAssets[state];
           return (
             <li key={state} className="appearance-editor__state-row">
-              <span className="appearance-editor__state-label">{state}</span>
+              <span className="appearance-editor__state-label">
+                {STATE_LABELS[state][language]}
+              </span>
               <span className="appearance-editor__file-name">
                 {fileName ?? "(未设置)"}
               </span>
